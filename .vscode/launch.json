@@ -5,15 +5,14 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Python: Current File",
+            "name": "train",
             "type": "python",
             "request": "launch",
-            "program": "${file}",
-            "console": "integratedTerminal",
+            "module": "src.run_nerf",
             "justMyCode": true,
             "args": [
                 "--config",
-                "configs/lego.txt",
+                "configs/lego.yaml",
                 "--finest_res",
                 "512",
                 "--log2_hashmap_size",
@@ -23,6 +22,6 @@
                 "--lrate_decay",
                 "10"
             ]
-        }
+        },
     ]
 }
