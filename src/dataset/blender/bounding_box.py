@@ -1,10 +1,14 @@
 import numpy as np
 import torch
 
+from src.dataset.blender.dataset import BlenderDataset
 from src.ray_utils import get_ray_directions, get_rays
 
 
-def get_bbox3d_for_blenderobj(camera_transforms, H, W, near=2.0, far=6.0):
+def get_bbox3d_for_blenderobj(
+    dataset: BlenderDataset, camera_transforms, H, W, near=2.0, far=6.0
+):
+    H, W, focal = dataset.H, dataset.W, dataset.focal
     camera_angle_x = float(camera_transforms["camera_angle_x"])
     focal = 0.5 * W / np.tan(0.5 * camera_angle_x)
 

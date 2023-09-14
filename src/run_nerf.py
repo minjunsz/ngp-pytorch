@@ -18,6 +18,7 @@ from src.loss import sigma_sparsity_loss, total_variation_loss
 from src.radam import RAdam
 from src.run_nerf_helpers import *
 from src.utils.config import config_parser
+from src.utils.constants import declare_globals
 
 DEVICE_ID = 0
 DEBUG = False
@@ -747,5 +748,8 @@ def train():
 
 if __name__ == "__main__":
     torch.set_default_tensor_type("torch.cuda.FloatTensor")
+    # TODO: config 추출을 main block 안에서 하고, 그거 기반으로 default device 설정까지 여기서 해버리자.
+    # TODO: config logging 하는것도 여기서 바로 해버리면 될듯?
+    declare_globals()
 
     train()
