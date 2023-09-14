@@ -2,7 +2,7 @@ from itertools import product
 
 import torch
 
-BOX_OFFSETS: torch.Tensor
+BOX_OFFSETS = torch.tensor(list(product([0, 1], [0, 1], [0, 1])), device="cuda")
 
 
 def declare_globals() -> None:
@@ -11,3 +11,4 @@ def declare_globals() -> None:
     """
     global BOX_OFFSETS
     BOX_OFFSETS = torch.tensor(list(product([0, 1], [0, 1], [0, 1])))
+    print(BOX_OFFSETS)

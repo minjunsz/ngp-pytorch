@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from src.utils.hash_grid_utils import get_voxel_vertices
+from src.models.hash_encoding.utils import get_voxel_vertices
 
 
 class HashEmbedder(nn.Module):

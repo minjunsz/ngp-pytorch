@@ -2,6 +2,7 @@ import os
 import pickle
 import time
 from pathlib import Path
+from pprint import pprint
 
 import imageio
 import matplotlib.pyplot as plt
@@ -13,9 +14,11 @@ import wandb
 from torch.distributions import Categorical
 from tqdm import tqdm, trange
 
-from src.dataset.load_blender import load_blender_data
+from src.dataset.blender.bounding_box import get_bbox3d_for_blenderobj
+from src.dataset.blender.dataset import BlenderDataset
 from src.loss import sigma_sparsity_loss, total_variation_loss
 from src.radam import RAdam
+from src.ray_utils import get_rays_from_parameter
 from src.run_nerf_helpers import *
 from src.utils.config import config_parser
 from src.utils.constants import declare_globals
@@ -101,7 +104,7 @@ def render(
     """
     if c2w is not None:
         # special case to render full image
-        rays_o, rays_d = get_rays(H, W, K, c2w)
+        rays_o, rays_d = get_rays_from_parameter(H, W, K, c2w)
     else:
         # use provided ray batch
         rays_o, rays_d = rays
@@ -109,7 +112,7 @@ def render(
     viewdirs = rays_d
     if c2w_staticcam is not None:
         # special case to visualize effect of viewdirs
-        rays_o, rays_d = get_rays(H, W, K, c2w_staticcam)
+        rays_o, rays_d = get_rays_from_parameter(H, W, K, c2w_staticcam)
     viewdirs = viewdirs / torch.norm(viewdirs, dim=-1, keepdim=True)
     viewdirs = torch.reshape(viewdirs, [-1, 3]).float()
 
@@ -490,26 +493,27 @@ def train():
     args = parser.parse_args()
 
     # Load data
-    K = None
-    images, poses, render_poses, hwf, i_split, bounding_box = load_blender_data(
-        args.datadir, args.half_res, args.testskip
+    dataset = BlenderDataset(
+        args.datadir,
+        "train",
+        half_res=args.half_res,
+        precrop_frac=args.precrop_frac,
+        N_rand=args.N_rand,
     )
-    args.bounding_box = bounding_box
-    print("Loaded blender", images.shape, render_poses.shape, hwf, args.datadir)
-    i_train, i_val, i_test = i_split
+
+    # TODO PPRINT로 인쇄하기
+    pprint(
+        {
+            "Image shape": dataset.imgs.shape,
+            "Render Pose shape": dataset.render_poses.shape,
+            "H,W,focal": (dataset.H, dataset.W, dataset.focal),
+            "datadir": dataset.basedir,
+        }
+    )
 
     near = 2.0
     far = 6.0
-
-    images = images[..., :3] * images[..., -1:] + (1.0 - images[..., -1:])
-
-    # Cast intrinsics to right types
-    H, W, focal = hwf
-    H, W = int(H), int(W)
-    hwf = [H, W, focal]
-
-    if K is None:
-        K = np.array([[focal, 0, 0.5 * W], [0, focal, 0.5 * H], [0, 0, 1]])
+    args.bounding_box = get_bbox3d_for_blenderobj(dataset, near=near, far=far)
 
     # Create log dir and copy the config file
     basedir = args.basedir
@@ -538,17 +542,14 @@ def train():
     render_kwargs_test.update(bds_dict)
 
     # Move testing data to GPU
-    render_poses = torch.tensor(render_poses, device=device)
+    render_poses = torch.tensor(dataset.render_poses, device=device)
 
     # Prepare raybatch tensor if batching random rays
     N_rand = args.N_rand
-    poses = torch.tensor(poses, device=device)
+    poses = torch.tensor(dataset.poses, device=device)
 
     N_iters = 5000 + 1
-    print("Begin")
-    print("TRAIN views are", i_train)
-    print("TEST views are", i_test)
-    print("VAL views are", i_val)
+    print("Train Start")
 
     loss_list = []
     psnr_list = []
@@ -556,51 +557,18 @@ def train():
     start = start + 1
     time0 = time.time()
     for i in trange(start, N_iters):
+        if i == args.precrop_iters:
+            dataset.precrop = False
+
         # Random from one image
-        img_i = np.random.choice(i_train)
-        target = images[img_i]
-        target = torch.tensor(target, device=device)
-        pose = poses[img_i, :3, :4]
-
-        rays_o, rays_d = get_rays(H, W, K, torch.Tensor(pose))  # (H, W, 3), (H, W, 3)
-
-        if i < args.precrop_iters:
-            dH = int(H // 2 * args.precrop_frac)
-            dW = int(W // 2 * args.precrop_frac)
-            coords = torch.stack(
-                torch.meshgrid(
-                    torch.linspace(H // 2 - dH, H // 2 + dH - 1, 2 * dH),
-                    torch.linspace(W // 2 - dW, W // 2 + dW - 1, 2 * dW),
-                ),
-                -1,
-            )
-            if i == start:
-                print(
-                    f"[Config] Center cropping of size {2*dH} x {2*dW} is enabled until iter {args.precrop_iters}"
-                )
-        else:
-            coords = torch.stack(
-                torch.meshgrid(
-                    torch.linspace(0, H - 1, H), torch.linspace(0, W - 1, W)
-                ),
-                -1,
-            )  # (H, W, 2)
-
-        coords = torch.reshape(coords, [-1, 2])  # (H * W, 2)
-        select_inds = np.random.choice(
-            coords.shape[0], size=[N_rand], replace=False
-        )  # (N_rand,)
-        select_coords = coords[select_inds].long()  # (N_rand, 2)
-        rays_o = rays_o[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
-        rays_d = rays_d[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
-        batch_rays = torch.stack([rays_o, rays_d], 0)
-        target_s = target[select_coords[:, 0], select_coords[:, 1]]  # (N_rand, 3)
+        img_i = np.random.randint(0, len(dataset))
+        batch_rays, target_s = dataset[img_i]
 
         #####  Core optimization loop  #####
         rgb, depth, acc, extras = render(
-            H,
-            W,
-            K,
+            dataset.H,
+            dataset.W,
+            dataset.K,
             chunk=args.chunk,
             rays=batch_rays,
             verbose=i < 10,
@@ -750,6 +718,4 @@ if __name__ == "__main__":
     torch.set_default_tensor_type("torch.cuda.FloatTensor")
     # TODO: config 추출을 main block 안에서 하고, 그거 기반으로 default device 설정까지 여기서 해버리자.
     # TODO: config logging 하는것도 여기서 바로 해버리면 될듯?
-    declare_globals()
-
     train()

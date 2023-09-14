@@ -5,7 +5,7 @@ from math import exp, floor, log
 import torch
 import torch.nn.functional as F
 
-from src.utils.hash_grid_utils import hash
+from src.utils.fast_hash import fast_hash
 
 
 def total_variation_loss(
@@ -20,7 +20,6 @@ def total_variation_loss(
     max_cube_size = 50  # can be tuned
     if min_cube_size > max_cube_size:
         print("ALERT! min cuboid size greater than max!")
-        pdb.set_trace()
     cube_size = torch.floor(
         torch.clip(resolution / 10.0, min_cube_size, max_cube_size)
     ).int()
@@ -32,7 +31,7 @@ def total_variation_loss(
     )
     cube_indices = torch.stack(torch.meshgrid(idx[:, 0], idx[:, 1], idx[:, 2]), dim=-1)
 
-    hashed_indices = hash(cube_indices, log2_hashmap_size)
+    hashed_indices = fast_hash(cube_indices, log2_hashmap_size)
     cube_embeddings = embeddings(hashed_indices)
     # hashed_idx_offset_x = hash(idx+torch.tensor([1,0,0]), log2_hashmap_size)
     # hashed_idx_offset_y = hash(idx+torch.tensor([0,1,0]), log2_hashmap_size)

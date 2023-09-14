@@ -1,7 +1,7 @@
 import numpy as np
 import torch
 
-from src.ray_utils import get_ray_directions, get_rays
+from src.ray_utils import get_ray_directions, get_rays_from_direction
 
 
 def get_bbox3d_for_blenderobj(camera_transforms, H, W, near=2.0, far=6.0):
@@ -18,7 +18,7 @@ def get_bbox3d_for_blenderobj(camera_transforms, H, W, near=2.0, far=6.0):
 
     for frame in camera_transforms["frames"]:
         c2w = torch.FloatTensor(frame["transform_matrix"])
-        rays_o, rays_d = get_rays(directions, c2w)
+        rays_o, rays_d = get_rays_from_direction(directions, c2w)
 
         def find_min_max(pt):
             for i in range(3):

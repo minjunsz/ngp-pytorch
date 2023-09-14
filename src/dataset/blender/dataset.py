@@ -9,8 +9,7 @@ import torch
 from torch.utils.data import Dataset
 
 from src.dataset.spherical_pose import get_pose_spherical
-from src.run_nerf_helpers import get_rays
-from src.utils.hash_grid_utils import get_bbox3d_for_blenderobj
+from src.ray_utils import get_rays_from_parameter
 
 
 class BlenderDataset(Dataset):
@@ -25,6 +24,7 @@ class BlenderDataset(Dataset):
         N_rand: int = 1024,
     ):
         super(BlenderDataset, self).__init__()
+        self.basedir = basedir
         self.precrop = precrop
         self.precrop_frac = precrop_frac
         self.N_rand = N_rand
@@ -83,15 +83,13 @@ class BlenderDataset(Dataset):
             ]
         )
 
-    @property
-    def bounding_box(self):
-        return get_bbox3d_for_blenderobj(self.meta, self.H, self.W, near=2.0, far=6.0)
-
     def __getitem__(self, index):
         target = self.imgs[index]
         target = torch.tensor(target)
         pose = self.poses[index, :3, :4]
-        rays_o, rays_d = get_rays(self.H, self.W, self.K, torch.tensor(pose))
+        rays_o, rays_d = get_rays_from_parameter(
+            self.H, self.W, self.K, torch.tensor(pose)
+        )
 
         if self.precrop:
             dH = int(self.H // 2 * self.precrop_frac)
