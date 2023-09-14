@@ -27,7 +27,7 @@ DEVICE_ID = 0
 DEBUG = False
 
 device = torch.device(f"cuda:{DEVICE_ID}" if torch.cuda.is_available() else "cpu")
-np.random.seed(0)
+np.random.seed(100)
 
 
 def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024 * 64):
@@ -141,7 +141,9 @@ def render(
 
 def render_path(
     render_poses,
-    hwf,
+    H,
+    W,
+    focal,
     K,
     chunk,
     render_kwargs,
@@ -149,7 +151,6 @@ def render_path(
     savedir=None,
     render_factor=0,
 ):
-    H, W, focal = hwf
     near, far = render_kwargs["near"], render_kwargs["far"]
 
     if render_factor != 0:
@@ -338,9 +339,11 @@ def raw2outputs(raw, z_vals, rays_d, raw_noise_std=0, white_bkgd=False, pytest=F
 
     # Calculate weights sparsity loss
     try:
+        # Simplex check's tolerance is 1e-6, but cuda computation leads to higher numerical errors.
+        # To remove the numerical instability, I enlarged the auxiliary value 1e-6 to 2e-6
         entropy = Categorical(
             probs=torch.cat(
-                [weights, 1.0 - weights.sum(-1, keepdim=True) + 1e-6], dim=-1
+                [weights, 1.0 - weights.sum(-1, keepdim=True) + 2e-6], dim=-1
             )
         ).entropy()
     except:
@@ -500,8 +503,15 @@ def train():
         precrop_frac=args.precrop_frac,
         N_rand=args.N_rand,
     )
+    test_dataset = BlenderDataset(
+        args.datadir,
+        "test",
+        testskip=args.testskip * 2,
+        half_res=args.half_res,
+        precrop=False,
+        N_rand=args.N_rand,
+    )
 
-    # TODO PPRINT로 인쇄하기
     pprint(
         {
             "Image shape": dataset.imgs.shape,
@@ -668,7 +678,13 @@ def train():
             # Turn on testing mode
             with torch.no_grad():
                 rgbs, disps = render_path(
-                    render_poses, hwf, K, args.chunk, render_kwargs_test
+                    render_poses,
+                    dataset.H,
+                    dataset.W,
+                    dataset.focal,
+                    dataset.K,
+                    args.chunk,
+                    render_kwargs_test,
                 )
             print("Done, saving", rgbs.shape, disps.shape)
             moviebase = os.path.join(
@@ -689,15 +705,17 @@ def train():
         if i % args.i_testset == 0 and i > 0:
             testsavedir = os.path.join(basedir, expname, "testset_{:06d}".format(i))
             os.makedirs(testsavedir, exist_ok=True)
-            print("test poses shape", poses[i_test].shape)
+            print("test poses shape", test_dataset.poses.shape)
             with torch.no_grad():
                 render_path(
-                    torch.Tensor(poses[i_test]).to(device),
-                    hwf,
-                    K,
+                    torch.tensor(test_dataset.poses),
+                    test_dataset.H,
+                    test_dataset.W,
+                    test_dataset.focal,
+                    test_dataset.K,
                     args.chunk,
                     render_kwargs_test,
-                    gt_imgs=images[i_test],
+                    gt_imgs=test_dataset.imgs,
                     savedir=testsavedir,
                 )
             print("Saved test set")
