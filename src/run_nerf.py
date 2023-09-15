@@ -567,7 +567,7 @@ def train():
     start = start + 1
     time0 = time.time()
     for i in trange(start, N_iters):
-        if i == args.precrop_iters:
+        if i >= args.precrop_iters:
             dataset.precrop = False
 
         # Random from one image

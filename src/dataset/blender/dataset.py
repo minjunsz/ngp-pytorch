@@ -43,12 +43,12 @@ class BlenderDataset(Dataset):
             imgs.append(imageio.imread(fname))
             poses.append(np.array(frame["transform_matrix"]))
         # keep all 4 channels (RGBA)
-        self.imgs = np.array(imgs, dtype=np.float32) / 255.0
-        self.poses = np.array(poses, dtype=np.float32)
+        self.imgs = np.array(imgs, dtype=np.float64) / 255.0
+        self.poses = np.array(poses, dtype=np.float64)
 
         self.H, self.W = self.imgs[0].shape[:2]
         camera_angle_x = float(self.meta["camera_angle_x"])
-        focal = 0.5 * self.W / np.tan(0.5 * camera_angle_x)
+        self.focal = 0.5 * self.W / np.tan(0.5 * camera_angle_x)
 
         self.render_poses = torch.stack(
             [
@@ -61,7 +61,7 @@ class BlenderDataset(Dataset):
         if half_res:
             self.H = self.H // 2
             self.W = self.W // 2
-            self.focal = focal / 2.0
+            self.focal = self.focal / 2.0
 
             imgs_half_res = np.zeros((self.imgs.shape[0], self.H, self.W, 4))
             for i, img in enumerate(self.imgs):
@@ -71,7 +71,9 @@ class BlenderDataset(Dataset):
             self.imgs = imgs_half_res
 
         # White Background
-        self.imgs = self.imgs[..., :3] * self.imgs[..., -1:] + (1 - self.imgs[..., -1:])
+        self.imgs = self.imgs[..., :3] * self.imgs[..., -1:] + (
+            1.0 - self.imgs[..., -1:]
+        )
 
     @property
     def K(self):

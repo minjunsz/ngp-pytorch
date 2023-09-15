@@ -6,7 +6,8 @@ chunk: 32768 # number of rays processed in parallel, decrease if running out of 
 config: None # config file path
 datadir: ./data/nerf_synthetic/lego # input data directory
 dataset_type: blender # options: llff / blender / deepvoxels
-expname: refactoring2 # experiment name
+# expname: stability_test_float_32 # experiment name
+expname: debug # experiment name
 finest_res: 512 # finest resolultion for hashed embedding
 half_res: True # load blender synthetic data at 400x400 instead of 800x800
 i_embed: 1 # set 1 for hashed embedding, 0 for default positional encoding, 2 for spherical
