@@ -12,22 +12,22 @@ import torch.nn as nn
 import torch.nn.functional as F
 import wandb
 from torch.distributions import Categorical
+from torch.optim import RAdam
 from tqdm import tqdm, trange
 
 from src.dataset.blender.bounding_box import get_bbox3d_for_blenderobj
 from src.dataset.blender.dataset import BlenderDataset
 from src.loss import sigma_sparsity_loss, total_variation_loss
-from src.radam import RAdam
 from src.ray_utils import get_rays_from_parameter
 from src.run_nerf_helpers import *
 from src.utils.config import config_parser
-from src.utils.constants import declare_globals
 
 DEVICE_ID = 0
 DEBUG = False
 
 device = torch.device(f"cuda:{DEVICE_ID}" if torch.cuda.is_available() else "cpu")
-np.random.seed(100)
+np.random.seed(0)
+torch.manual_seed(0)
 
 
 def run_network(inputs, viewdirs, fn, embed_fn, embeddirs_fn, netchunk=1024 * 64):
@@ -551,13 +551,6 @@ def train():
     render_kwargs_train.update(bds_dict)
     render_kwargs_test.update(bds_dict)
 
-    # Move testing data to GPU
-    render_poses = torch.tensor(dataset.render_poses, device=device)
-
-    # Prepare raybatch tensor if batching random rays
-    N_rand = args.N_rand
-    poses = torch.tensor(dataset.poses, device=device)
-
     N_iters = 5000 + 1
     print("Train Start")
 
@@ -678,7 +671,7 @@ def train():
             # Turn on testing mode
             with torch.no_grad():
                 rgbs, disps = render_path(
-                    render_poses,
+                    dataset.render_poses,
                     dataset.H,
                     dataset.W,
                     dataset.focal,
