@@ -55,7 +55,9 @@ def get_rays_from_direction(directions, c2w):
 
 def get_rays_from_parameter(H, W, K, c2w):
     i, j = torch.meshgrid(
-        torch.linspace(0, W - 1, W), torch.linspace(0, H - 1, H)
+        torch.linspace(0, W - 1, W),
+        torch.linspace(0, H - 1, H),
+        indexing="ij",
     )  # pytorch's meshgrid has indexing='ij'
     i = i.t()
     j = j.t()

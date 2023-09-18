@@ -100,6 +100,7 @@ class BlenderDataset(Dataset):
                 torch.meshgrid(
                     torch.linspace(self.H // 2 - dH, self.H // 2 + dH - 1, 2 * dH),
                     torch.linspace(self.W // 2 - dW, self.W // 2 + dW - 1, 2 * dW),
+                    indexing="ij",
                 ),
                 -1,
             )
@@ -108,6 +109,7 @@ class BlenderDataset(Dataset):
                 torch.meshgrid(
                     torch.linspace(0, self.H - 1, self.H),
                     torch.linspace(0, self.W - 1, self.W),
+                    indexing="ij",
                 ),
                 -1,
             )  # (H, W, 2)

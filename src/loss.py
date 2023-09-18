@@ -29,18 +29,14 @@ def total_variation_loss(
     idx = min_vertex + torch.stack(
         [torch.arange(cube_size + 1) for _ in range(3)], dim=-1
     )
-    cube_indices = torch.stack(torch.meshgrid(idx[:, 0], idx[:, 1], idx[:, 2]), dim=-1)
+    cube_indices = torch.stack(
+        torch.meshgrid(idx[:, 0], idx[:, 1], idx[:, 2], indexing="ij"), dim=-1
+    )
 
     hashed_indices = fast_hash(cube_indices, log2_hashmap_size)
     cube_embeddings = embeddings(hashed_indices)
-    # hashed_idx_offset_x = hash(idx+torch.tensor([1,0,0]), log2_hashmap_size)
-    # hashed_idx_offset_y = hash(idx+torch.tensor([0,1,0]), log2_hashmap_size)
-    # hashed_idx_offset_z = hash(idx+torch.tensor([0,0,1]), log2_hashmap_size)
 
     # Compute loss
-    # tv_x = torch.pow(embeddings(hashed_idx)-embeddings(hashed_idx_offset_x), 2).sum()
-    # tv_y = torch.pow(embeddings(hashed_idx)-embeddings(hashed_idx_offset_y), 2).sum()
-    # tv_z = torch.pow(embeddings(hashed_idx)-embeddings(hashed_idx_offset_z), 2).sum()
     tv_x = torch.pow(
         cube_embeddings[1:, :, :, :] - cube_embeddings[:-1, :, :, :], 2
     ).sum()
